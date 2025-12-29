@@ -3,8 +3,6 @@ package model;
 import java.util.ArrayList;
 import java.util.List;
 
-import modelAI.Position;
-
 public class Pawn extends Piece{
 
 	public Pawn(PieceColor color, int row, int col) {

@@ -2,8 +2,6 @@ package model;
 import java.util.ArrayList;
 import java.util.List;
 
-import modelAI.Position;
-
 public class Bishop extends Piece {
 
     public Bishop(PieceColor color, int row, int col) {

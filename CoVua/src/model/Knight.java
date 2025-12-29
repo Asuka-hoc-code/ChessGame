@@ -2,8 +2,6 @@ package model;
 import java.util.ArrayList;
 import java.util.List;
 
-import modelAI.Position;
-
 public class Knight extends Piece {
 
     public Knight(PieceColor color, int row, int col) {

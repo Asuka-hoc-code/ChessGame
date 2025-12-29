@@ -2,9 +2,10 @@ package model;
 import java.util.ArrayList;
 import java.util.List;
 
-import modelAI.Position;
-
 public class King extends Piece {
+    
+    // Thêm biến static để kiểm soát đệ quy
+    private static boolean checkingForCastling = false;
 
     public King(PieceColor color, int row, int col) {
         super(color, row, col);
@@ -33,12 +34,31 @@ public class King extends Piece {
             }
         }
 
-        // Castling có thể xử lý thêm ở Game nếu muốn
+        // Chỉ kiểm tra nhập thành nếu không đang trong quá trình kiểm tra đệ quy
+        if (!checkingForCastling) {
+            checkingForCastling = true;
+            try {
+                // Chỉ kiểm tra nhập thành nếu vua ở vị trí ban đầu
+                if (row == (color == PieceColor.WHITE ? 7 : 0) && col == 4) {
+                    // Nhập thành ngắn (kingside)
+                    if (board.canCastle(color, true)) {
+                        moves.add(new Position(row, col + 2));
+                    }
+                    // Nhập thành dài (queenside)
+                    if (board.canCastle(color, false)) {
+                        moves.add(new Position(row, col - 2));
+                    }
+                }
+            } finally {
+                checkingForCastling = false;
+            }
+        }
+
         return moves;
     }
-
-	@Override
-	public Piece clonePiece() {
-		return new King(this.color, this.row, this.col);
-	}
+    
+    @Override
+    public Piece clonePiece() {
+        return new King(this.color, this.row, this.col);
+    }
 }
