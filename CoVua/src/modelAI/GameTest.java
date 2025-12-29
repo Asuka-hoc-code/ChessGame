@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Scanner;
 
 import model.Board;
+import model.Move;
 import model.PieceColor;
 
 public class GameTest {
@@ -14,7 +15,7 @@ public class GameTest {
     private String winner;
     
     public GameTest() {
-        board = new Board();
+        board = new Board(false);
         currentPlayer = PieceColor.WHITE; // Trắng đi trước
         gameOver = false;
         winner = null;
