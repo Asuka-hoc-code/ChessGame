@@ -5,7 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
 import model.*;
-import modelAI.*;
+import modelAI.ChessAI;
 
 public class ChessUI extends JFrame {
     private Board board;
@@ -16,29 +16,51 @@ public class ChessUI extends JFrame {
     private JPanel boardPanel;
     private JTextArea moveHistoryArea;
     
-    // Màu sắc cho bàn cờ
-    private Color lightColor = new Color(240, 217, 181);
-    private Color darkColor = new Color(181, 136, 99);
+    // Màu sắc cố định cho bàn cờ
+    private final Color lightColor = new Color(240, 217, 181);
+    private final Color darkColor = new Color(181, 136, 99);
     private final Color HIGHLIGHT_COLOR = new Color(255, 255, 100, 150);
     private final Color SELECTED_COLOR = new Color(100, 200, 255, 150);
     
-    // Màu sắc cho quân cờ
-    private Color whitePieceColor = Color.WHITE;
-    private Color blackPieceColor = Color.BLACK;
-    private Color whitePieceOutline = Color.LIGHT_GRAY;
-    private Color blackPieceOutline = Color.DARK_GRAY;
+    // Màu sắc cố định cho quân cờ
+    private final Color whitePieceColor = Color.WHITE;
+    private final Color blackPieceColor = Color.BLACK;
+    private final Color whitePieceOutline = Color.LIGHT_GRAY;
+    private final Color blackPieceOutline = Color.DARK_GRAY;
+    
+    // Biến cho phong cấp
+    private int selectedPromotion = -1;
+    private JDialog promotionDialog;
+    private static final int QUEEN = 0;
+    private static final int ROOK = 1;
+    private static final int BISHOP = 2;
+    private static final int KNIGHT = 3;
+    
+    // AI
+    private ChessAI chessAI;
+    private boolean vsAI = true;
+    private PieceColor aiColor = PieceColor.BLACK;
+    private Timer aiTimer;
+    
+    // Độ khó AI
+    private int aiDifficulty = 3;
     
     public ChessUI() {
         board = new Board();
         currentPlayer = PieceColor.WHITE;
         selectedPosition = null;
         
+        // Khởi tạo AI với độ khó mặc định
+        chessAI = new ChessAI(aiColor, aiDifficulty);
+        
         initializeUI();
         updateBoard();
+        
+
     }
     
     private void initializeUI() {
-        setTitle("Java Chess Game - Fixed Board Colors");
+        setTitle("Java Chess Game - Chơi với Máy");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
         
@@ -189,16 +211,21 @@ public class ChessUI extends JFrame {
         infoPanel.setPreferredSize(new Dimension(200, 600));
         
         // Label trạng thái
-        statusLabel = new JLabel("Lượt: TRẮNG");
+        statusLabel = new JLabel("Lượt: TRẮNG (BẠN)");
         statusLabel.setFont(new Font("Arial", Font.BOLD, 16));
         statusLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        // Label AI
+        JLabel aiLabel = new JLabel("AI: ĐEN - Cấp " + aiDifficulty);
+        aiLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        aiLabel.setForeground(Color.BLUE);
+        aiLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         
         // Nút chức năng
         JButton newGameBtn = createButton("Trận mới", e -> newGame());
         JButton undoBtn = createButton("Hoàn tác", e -> undoMove());
         JButton resignBtn = createButton("Đầu hàng", e -> resign());
-        JButton helpBtn = createButton("Nước đi hợp lệ", e -> showLegalMoves());
-        JButton colorBtn = createButton("Đổi màu quân", e -> changePieceColors());
+        JButton aiSettingsBtn = createButton("Cài đặt AI", e -> showAISettings());
         
         // Khu vực lịch sử nước đi
         JLabel historyLabel = new JLabel("Lịch sử nước đi:");
@@ -211,6 +238,8 @@ public class ChessUI extends JFrame {
         
         // Thêm các thành phần vào infoPanel
         infoPanel.add(statusLabel);
+        infoPanel.add(Box.createVerticalStrut(5));
+        infoPanel.add(aiLabel);
         infoPanel.add(Box.createVerticalStrut(10));
         infoPanel.add(newGameBtn);
         infoPanel.add(Box.createVerticalStrut(5));
@@ -218,9 +247,7 @@ public class ChessUI extends JFrame {
         infoPanel.add(Box.createVerticalStrut(5));
         infoPanel.add(resignBtn);
         infoPanel.add(Box.createVerticalStrut(5));
-        infoPanel.add(helpBtn);
-        infoPanel.add(Box.createVerticalStrut(5));
-        infoPanel.add(colorBtn);
+        infoPanel.add(aiSettingsBtn);
         infoPanel.add(Box.createVerticalStrut(20));
         infoPanel.add(historyLabel);
         infoPanel.add(Box.createVerticalStrut(5));
@@ -244,51 +271,34 @@ public class ChessUI extends JFrame {
         JMenuItem newGameItem = new JMenuItem("Trận mới");
         JMenuItem undoItem = new JMenuItem("Hoàn tác");
         JMenuItem resignItem = new JMenuItem("Đầu hàng");
+        JMenuItem aiSettingsItem = new JMenuItem("Cài đặt AI...");
         JMenuItem exitItem = new JMenuItem("Thoát");
         
         newGameItem.addActionListener(e -> newGame());
         undoItem.addActionListener(e -> undoMove());
         resignItem.addActionListener(e -> resign());
+        aiSettingsItem.addActionListener(e -> showAISettings());
         exitItem.addActionListener(e -> System.exit(0));
         
         gameMenu.add(newGameItem);
         gameMenu.add(undoItem);
         gameMenu.add(resignItem);
         gameMenu.addSeparator();
+        gameMenu.add(aiSettingsItem);
+        gameMenu.addSeparator();
         gameMenu.add(exitItem);
         
-        JMenu viewMenu = new JMenu("Hiển thị");
-        JMenuItem pieceColorItem = new JMenuItem("Thay đổi màu quân cờ");
-        pieceColorItem.addActionListener(e -> changePieceColors());
-        
-        JMenuItem boardColorItem = new JMenuItem("Thay đổi màu bàn cờ");
-        boardColorItem.addActionListener(e -> changeBoardColors());
-        
-        viewMenu.add(pieceColorItem);
-        viewMenu.add(boardColorItem);
-        
-        JMenu helpMenu = new JMenu("Trợ giúp");
-        JMenuItem movesItem = new JMenuItem("Hiển thị nước đi hợp lệ");
-        JMenuItem rulesItem = new JMenuItem("Luật chơi");
-        JMenuItem aboutItem = new JMenuItem("Giới thiệu");
-        
-        movesItem.addActionListener(e -> showLegalMoves());
-        rulesItem.addActionListener(e -> showRules());
-        aboutItem.addActionListener(e -> showAbout());
-        
-        helpMenu.add(movesItem);
-        helpMenu.add(rulesItem);
-        helpMenu.addSeparator();
-        helpMenu.add(aboutItem);
-        
         menuBar.add(gameMenu);
-        menuBar.add(viewMenu);
-        menuBar.add(helpMenu);
         
         setJMenuBar(menuBar);
     }
     
     private void handleSquareClick(int row, int col) {
+        // Nếu đang đến lượt AI (máy), bỏ qua click
+        if (vsAI && currentPlayer == aiColor) {
+            return;
+        }
+        
         // Nếu chưa chọn quân nào
         if (selectedPosition == null) {
             Piece piece = board.getPiece(row, col);
@@ -316,27 +326,254 @@ public class ChessUI extends JFrame {
                 return;
             }
             
-            // Thực hiện nước đi
-            if (board.makeMove(fromRow, fromCol, row, col, currentPlayer)) {
-                // Thêm vào lịch sử
-                addMoveToHistory(fromRow, fromCol, row, col);
+            // Kiểm tra xem có phải nước đi nhập thành không
+            Piece selectedPiece = board.getPiece(fromRow, fromCol);
+            boolean isCastlingMove = (selectedPiece instanceof King && Math.abs(fromCol - col) == 2);
+            
+            boolean moveSuccess = board.makeMove(fromRow, fromCol, row, col, currentPlayer);
+            
+            if (moveSuccess) {
+                // Kiểm tra xem có cần phong cấp không
+                handlePromotionIfNeeded(row, col);
+                
+                // Thêm vào lịch sử với ký hiệu "BẠN"
+                addMoveToHistory(fromRow, fromCol, row, col, isCastlingMove, true);
                 
                 // Kiểm tra kết thúc trò chơi
                 checkGameEnd();
                 
                 if (!board.isCheckmate(currentPlayer) && !board.isDraw()) {
-                    // Đổi lượt
-                    currentPlayer = (currentPlayer == PieceColor.WHITE) ? 
-                                    PieceColor.BLACK : PieceColor.WHITE;
-                    updateStatus();
+                    // Xóa selection và highlight
+                    clearHighlights();
+                    selectedPosition = null;
+                    updateBoard();
+                    
+                    // Nếu chơi với AI và chưa kết thúc, để AI đi
+                    if (vsAI && !board.isCheckmate(currentPlayer) && !board.isDraw()) {
+                        // Đổi lượt sang AI
+                        currentPlayer = aiColor;
+                        updateStatus();
+                        
+                        // Cho AI đi sau 500ms
+                        aiTimer = new Timer(500, e -> {
+                            makeAIMove();
+                            ((Timer)e.getSource()).stop();
+                        });
+                        aiTimer.setRepeats(false);
+                        aiTimer.start();
+                    } else if (!vsAI) {
+                        // Nếu không chơi với AI, đổi lượt bình thường
+                        currentPlayer = (currentPlayer == PieceColor.WHITE) ? 
+                                        PieceColor.BLACK : PieceColor.WHITE;
+                        updateStatus();
+                        updateBoard();
+                    }
+                } else {
+                    // Trò chơi kết thúc
+                    clearHighlights();
+                    selectedPosition = null;
+                    updateBoard();
                 }
+            } else {
+                // Nước đi không hợp lệ
+                JOptionPane.showMessageDialog(this, 
+                    "Nước đi không hợp lệ!", 
+                    "Lỗi", 
+                    JOptionPane.WARNING_MESSAGE);
             }
-            
-            // Xóa selection và highlight
-            clearHighlights();
-            selectedPosition = null;
-            updateBoard();
         }
+    }
+    
+    private void makeAIMove() {
+        if (!vsAI || currentPlayer != aiColor || 
+            board.isCheckmate(aiColor) || board.isDraw()) {
+            return;
+        }
+        
+        // Hiển thị trạng thái AI đang suy nghĩ
+        statusLabel.setText("MÁY đang suy nghĩ...");
+        
+        // Tạo thread riêng để AI tính toán
+        new Thread(() -> {
+            Move aiMove = chessAI.getBestMove(board, currentPlayer);
+            
+            // Thực hiện nước đi trên EDT
+            SwingUtilities.invokeLater(() -> {
+                if (aiMove != null) {
+                    // Thực hiện nước đi của AI
+                    boolean moveSuccess = board.makeMove(
+                        aiMove.fromRow, aiMove.fromCol, 
+                        aiMove.toRow, aiMove.toCol, 
+                        currentPlayer);
+                    
+                    if (moveSuccess) {
+                        // AI tự động phong cấp thành Hậu nếu cần
+                        handleAIPromotionIfNeeded(aiMove.toRow, aiMove.toCol);
+                        
+                        // Thêm vào lịch sử với ký hiệu "MÁY"
+                        boolean isCastling = (aiMove.moved instanceof King && 
+                                            Math.abs(aiMove.fromCol - aiMove.toCol) == 2);
+                        addMoveToHistory(aiMove.fromRow, aiMove.fromCol, 
+                                       aiMove.toRow, aiMove.toCol, 
+                                       isCastling, false);
+                        
+                        // Kiểm tra kết thúc trò chơi
+                        checkGameEnd();
+                        
+                        if (!board.isCheckmate(currentPlayer) && !board.isDraw()) {
+                            // Đổi lượt về người chơi
+                            currentPlayer = PieceColor.WHITE;
+                            updateStatus();
+                            
+                            // Cập nhật bàn cờ
+                            updateBoard();
+                        } else {
+                            // Trò chơi kết thúc
+                            updateBoard();
+                        }
+                    }
+                } else {
+                    // AI không tìm được nước đi
+                    JOptionPane.showMessageDialog(ChessUI.this,
+                        "Máy không tìm được nước đi hợp lệ!",
+                        "Lỗi AI",
+                        JOptionPane.WARNING_MESSAGE);
+                }
+            });
+        }).start();
+    }
+    
+    // Xử lý phong cấp cho AI (luôn chọn Hậu)
+    private void handleAIPromotionIfNeeded(int row, int col) {
+        Piece piece = board.getPiece(row, col);
+        if (piece instanceof Pawn) {
+            int promotionRow = (piece.getColor() == PieceColor.WHITE) ? 0 : 7;
+            if (row == promotionRow) {
+                // AI luôn phong cấp thành Hậu
+                Piece promotedPiece = new Queen(piece.getColor(), row, col);
+                board.setPiece(row, col, promotedPiece);
+                promotedPiece.setHasMoved(true);
+                
+                // Thêm thông tin vào lịch sử
+                moveHistoryArea.append("   → MÁY phong cấp thành Hậu\n");
+            }
+        }
+    }
+    
+    // Xử lý phong cấp cho người chơi
+    private void handlePromotionIfNeeded(int row, int col) {
+        Piece piece = board.getPiece(row, col);
+        if (piece instanceof Pawn) {
+            int promotionRow = (piece.getColor() == PieceColor.WHITE) ? 0 : 7;
+            if (row == promotionRow) {
+                // Hiển thị dialog chọn quân phong cấp
+                showPromotionDialog(row, col, piece.getColor());
+            }
+        }
+    }
+    
+    private void showPromotionDialog(int row, int col, PieceColor color) {
+        String[] options = {"Hậu", "Xe", "Tượng", "Mã"};
+        String[] symbols = color == PieceColor.WHITE ? 
+            new String[]{"♕", "♖", "♗", "♘"} : 
+            new String[]{"♛", "♜", "♝", "♞"};
+        
+        JPanel panel = new JPanel(new GridLayout(4, 1, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JButton[] buttons = new JButton[4];
+        
+        for (int i = 0; i < 4; i++) {
+            buttons[i] = new JButton(symbols[i] + " " + options[i]);
+            buttons[i].setFont(new Font("Arial Unicode MS", Font.BOLD, 20));
+            buttons[i].setPreferredSize(new Dimension(150, 60));
+            final int choice = i;
+            buttons[i].addActionListener(e -> {
+                selectedPromotion = choice;
+                applyPromotion(row, col, color, choice);
+                if (promotionDialog != null) {
+                    promotionDialog.dispose();
+                    promotionDialog = null;
+                }
+            });
+            panel.add(buttons[i]);
+        }
+        
+        promotionDialog = new JDialog(this, "Chọn quân phong cấp", true);
+        promotionDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        
+        // Xử lý đóng dialog (mặc định chọn Hậu)
+        promotionDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                selectedPromotion = QUEEN;
+                applyPromotion(row, col, color, QUEEN);
+                promotionDialog.dispose();
+                promotionDialog = null;
+            }
+        });
+        
+        promotionDialog.add(panel);
+        promotionDialog.pack();
+        promotionDialog.setLocationRelativeTo(this);
+        promotionDialog.setVisible(true);
+    }
+    
+    private void applyPromotion(int row, int col, PieceColor color, int promotionType) {
+        Piece promotedPiece = null;
+        
+        switch (promotionType) {
+            case QUEEN:
+                promotedPiece = new Queen(color, row, col);
+                break;
+            case ROOK:
+                promotedPiece = new Rook(color, row, col);
+                break;
+            case BISHOP:
+                promotedPiece = new Bishop(color, row, col);
+                break;
+            case KNIGHT:
+                promotedPiece = new Knight(color, row, col);
+                break;
+        }
+        
+        if (promotedPiece != null) {
+            board.setPiece(row, col, promotedPiece);
+            promotedPiece.setHasMoved(true);
+            
+            // Cập nhật lại giao diện
+            updateBoard();
+            
+            // Thêm thông tin phong cấp vào lịch sử
+            String pieceName = "";
+            switch (promotionType) {
+                case QUEEN: pieceName = "Hậu"; break;
+                case ROOK: pieceName = "Xe"; break;
+                case BISHOP: pieceName = "Tượng"; break;
+                case KNIGHT: pieceName = "Mã"; break;
+            }
+            moveHistoryArea.append("   → BẠN phong cấp thành " + pieceName + "\n");
+        }
+    }
+    
+    private void addMoveToHistory(int fromRow, int fromCol, int toRow, int toCol, 
+                                  boolean isCastling, boolean isPlayer) {
+        char fromColChar = (char)('a' + fromCol);
+        char toColChar = (char)('a' + toCol);
+        
+        String moveNotation;
+        if (isCastling) {
+            boolean kingside = (toCol > fromCol);
+            moveNotation = kingside ? "O-O (Nhập thành ngắn)" : "O-O-O (Nhập thành dài)";
+        } else {
+            moveNotation = String.format("%c%d → %c%d",
+                fromColChar, (8 - fromRow),
+                toColChar, (8 - toRow));
+        }
+        
+        String prefix = isPlayer ? "BẠN:  " : "MÁY: ";
+        moveHistoryArea.append(prefix + moveNotation + "\n");
+        moveHistoryArea.setCaretPosition(moveHistoryArea.getDocument().getLength());
     }
     
     private void highlightLegalMoves(int row, int col) {
@@ -362,42 +599,44 @@ public class ChessUI extends JFrame {
     }
     
     private void updateBoard() {
-        for (int row = 0; row < 8; row++) {
-            for (int col = 0; col < 8; col++) {
-                Piece piece = board.getPiece(row, col);
-                ChessSquare square = squares[row][col];
-                
-                if (piece != null) {
-                    // Sử dụng Unicode cho các quân cờ
-                    char symbol = piece.getSymbol();
-                    String unicode = getUnicodeChar(symbol);
+        SwingUtilities.invokeLater(() -> {
+            for (int row = 0; row < 8; row++) {
+                for (int col = 0; col < 8; col++) {
+                    Piece piece = board.getPiece(row, col);
+                    ChessSquare square = squares[row][col];
                     
-                    // Đặt màu cho quân cờ
-                    if (piece.getColor() == PieceColor.WHITE) {
-                        square.setPiece(unicode, whitePieceColor, whitePieceOutline);
+                    if (piece != null) {
+                        // Sử dụng Unicode cho các quân cờ
+                        char symbol = piece.getSymbol();
+                        String unicode = getUnicodeChar(symbol);
+                        
+                        // Đặt màu cho quân cờ
+                        if (piece.getColor() == PieceColor.WHITE) {
+                            square.setPiece(unicode, whitePieceColor, whitePieceOutline);
+                        } else {
+                            square.setPiece(unicode, blackPieceColor, blackPieceOutline);
+                        }
                     } else {
-                        square.setPiece(unicode, blackPieceColor, blackPieceOutline);
+                        square.clearPiece();
                     }
-                } else {
-                    square.clearPiece();
                 }
             }
-        }
-        
-        // Hiển thị cảnh báo chiếu
-        if (board.isInCheck(PieceColor.WHITE)) {
-            statusLabel.setText("Lượt: TRẮNG (ĐANG BỊ CHIẾU!)");
-            statusLabel.setForeground(Color.RED);
-        } else if (board.isInCheck(PieceColor.BLACK)) {
-            statusLabel.setText("Lượt: ĐEN (ĐANG BỊ CHIẾU!)");
-            statusLabel.setForeground(Color.RED);
-        } else {
-            updateStatus();
-            statusLabel.setForeground(Color.BLACK);
-        }
-        
-        // Cập nhật lại giao diện
-        boardPanel.repaint();
+            
+            // Hiển thị cảnh báo chiếu
+            if (board.isInCheck(PieceColor.WHITE)) {
+                statusLabel.setText("TRẮNG (BẠN) - ĐANG BỊ CHIẾU!");
+                statusLabel.setForeground(Color.RED);
+            } else if (board.isInCheck(PieceColor.BLACK)) {
+                statusLabel.setText("ĐEN (MÁY) - ĐANG BỊ CHIẾU!");
+                statusLabel.setForeground(Color.RED);
+            } else {
+                updateStatus();
+                statusLabel.setForeground(Color.BLACK);
+            }
+            
+            // Cập nhật lại giao diện
+            boardPanel.repaint();
+        });
     }
     
     private String getUnicodeChar(char symbol) {
@@ -414,40 +653,37 @@ public class ChessUI extends JFrame {
     
     private void updateStatus() {
         if (currentPlayer == PieceColor.WHITE) {
-            statusLabel.setText("Lượt: TRẮNG");
+            statusLabel.setText("Lượt: TRẮNG (BẠN)");
         } else {
-            statusLabel.setText("Lượt: ĐEN");
+            statusLabel.setText("Lượt: ĐEN (MÁY)");
         }
-    }
-    
-    private void addMoveToHistory(int fromRow, int fromCol, int toRow, int toCol) {
-        char fromColChar = (char)('a' + fromCol);
-        char toColChar = (char)('a' + toCol);
-        
-        String moveNotation = String.format("%c%d → %c%d",
-            fromColChar, (8 - fromRow),
-            toColChar, (8 - toRow));
-        
-        moveHistoryArea.append(moveNotation + "\n");
-        moveHistoryArea.setCaretPosition(moveHistoryArea.getDocument().getLength());
     }
     
     private void checkGameEnd() {
         if (board.isCheckmate(PieceColor.WHITE)) {
             JOptionPane.showMessageDialog(this,
-                "CHIẾU HẾT!\nĐEN THẮNG!",
+                "CHIẾU HẾT!\nMÁY THẮNG!",
                 "Trận đấu kết thúc",
                 JOptionPane.INFORMATION_MESSAGE);
             disableBoard();
         } else if (board.isCheckmate(PieceColor.BLACK)) {
             JOptionPane.showMessageDialog(this,
-                "CHIẾU HẾT!\nTRẮNG THẮNG!",
+                "CHIẾU HẾT!\nBẠN THẮNG!",
                 "Trận đấu kết thúc",
                 JOptionPane.INFORMATION_MESSAGE);
             disableBoard();
         } else if (board.isDraw()) {
+            String drawReason = "HÒA!\n";
+            if (board.isStalemate(PieceColor.WHITE) || board.isStalemate(PieceColor.BLACK)) {
+                drawReason += "Lý do: Hết nước đi hợp lệ (Stalemate)";
+            } else if (board.getHalfMoveClock() >= 100) {
+                drawReason += "Lý do: 50 nước không ăn quân";
+            } else {
+                drawReason += "Lý do: Cờ hòa";
+            }
+            
             JOptionPane.showMessageDialog(this,
-                "HÒA!\nHết nước đi hợp lệ.",
+                drawReason,
                 "Trận đấu kết thúc",
                 JOptionPane.INFORMATION_MESSAGE);
             disableBoard();
@@ -459,6 +695,9 @@ public class ChessUI extends JFrame {
             for (int col = 0; col < 8; col++) {
                 squares[row][col].setEnabled(false);
             }
+        }
+        if (aiTimer != null && aiTimer.isRunning()) {
+            aiTimer.stop();
         }
     }
     
@@ -489,8 +728,41 @@ public class ChessUI extends JFrame {
     }
     
     private void undoMove() {
-        if (board.undoLastMove()) {
-            // Đổi lượt về người chơi trước
+        // Không cho phép hoàn tác khi đang đến lượt AI
+        if (vsAI && currentPlayer == aiColor) {
+            JOptionPane.showMessageDialog(this,
+                "Không thể hoàn tác khi đang đến lượt máy!",
+                "Hoàn tác",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // Hoàn tác nước đi của AI (nếu có)
+        if (vsAI && currentPlayer == PieceColor.WHITE && !board.getMoveHistory().isEmpty()) {
+            // Hoàn tác nước đi của AI
+            if (board.undoLastMove()) {
+                // Hoàn tác nước đi của người chơi
+                if (board.undoLastMove()) {
+                    currentPlayer = PieceColor.WHITE;
+                    updateStatus();
+                    clearHighlights();
+                    updateBoard();
+                    
+                    // Xóa 2 dòng cuối trong lịch sử
+                    String text = moveHistoryArea.getText();
+                    if (!text.isEmpty()) {
+                        String[] lines = text.split("\n");
+                        StringBuilder newText = new StringBuilder();
+                        for (int i = 0; i < lines.length - 2; i++) {
+                            newText.append(lines[i]).append("\n");
+                        }
+                        moveHistoryArea.setText(newText.toString());
+                    }
+                }
+            }
+        } 
+        // Hoàn tác bình thường (không chơi với AI)
+        else if (board.undoLastMove()) {
             currentPlayer = (currentPlayer == PieceColor.WHITE) ? 
                             PieceColor.BLACK : PieceColor.WHITE;
             updateStatus();
@@ -516,227 +788,73 @@ public class ChessUI extends JFrame {
     }
     
     private void resign() {
-        String winner = (currentPlayer == PieceColor.WHITE) ? "ĐEN" : "TRẮNG";
+        String winner = (currentPlayer == PieceColor.WHITE) ? "MÁY" : "BẠN";
+        String resigner = (currentPlayer == PieceColor.WHITE) ? "BẠN" : "MÁY";
         
         int result = JOptionPane.showConfirmDialog(this,
-            "Bạn có chắc muốn đầu hàng? " + winner + " sẽ thắng.",
+            resigner + " có chắc muốn đầu hàng? " + winner + " sẽ thắng.",
             "Đầu hàng",
             JOptionPane.YES_NO_OPTION);
             
         if (result == JOptionPane.YES_OPTION) {
             JOptionPane.showMessageDialog(this,
-                winner + " THẮNG!\n" + currentPlayer + " đã đầu hàng.",
+                winner + " THẮNG!\n" + resigner + " đã đầu hàng.",
                 "Trận đấu kết thúc",
                 JOptionPane.INFORMATION_MESSAGE);
             disableBoard();
         }
     }
     
-    private void changePieceColors() {
-        Object[] options = {"Mặc định (Trắng/Đen)", "Xanh/Đỏ", "Vàng/Tím", "Tự chọn"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Chọn bộ màu cho quân cờ:",
-            "Thay đổi màu quân cờ",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]);
+    private void showAISettings() {
+        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        switch (choice) {
-            case 0: // Mặc định
-                whitePieceColor = Color.WHITE;
-                blackPieceColor = Color.BLACK;
-                whitePieceOutline = Color.LIGHT_GRAY;
-                blackPieceOutline = Color.DARK_GRAY;
-                break;
-            case 1: // Xanh/Đỏ
-                whitePieceColor = new Color(100, 200, 255); // Xanh nhạt
-                blackPieceColor = new Color(255, 100, 100); // Đỏ nhạt
-                whitePieceOutline = Color.BLUE;
-                blackPieceOutline = Color.RED;
-                break;
-            case 2: // Vàng/Tím
-                whitePieceColor = new Color(255, 255, 150); // Vàng nhạt
-                blackPieceColor = new Color(200, 150, 255); // Tím nhạt
-                whitePieceOutline = new Color(200, 200, 0);
-                blackPieceOutline = new Color(150, 0, 200);
-                break;
-            case 3: // Tự chọn
-                Color whiteColor = JColorChooser.showDialog(this, 
-                    "Chọn màu cho quân trắng", whitePieceColor);
-                Color blackColor = JColorChooser.showDialog(this, 
-                    "Chọn màu cho quân đen", blackPieceColor);
-                
-                if (whiteColor != null) whitePieceColor = whiteColor;
-                if (blackColor != null) blackPieceColor = blackColor;
-                
-                // Tạo outline tự động từ màu chính
-                whitePieceOutline = whitePieceColor.darker().darker();
-                blackPieceOutline = blackPieceColor.darker().darker();
-                break;
-            default:
-                return;
-        }
+        JLabel depthLabel = new JLabel("Độ khó AI (1-5):");
+        JComboBox<Integer> depthCombo = new JComboBox<>(new Integer[]{1, 2, 3, 4, 5});
+        depthCombo.setSelectedItem(aiDifficulty);
         
-        updateBoard();
-    }
-    
-    private void changeBoardColors() {
-        Object[] options = {"Mặc định", "Xanh lá/Xanh dương", "Xám/Hồng", "Tự chọn"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Chọn bộ màu cho bàn cờ:",
-            "Thay đổi màu bàn cờ",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]);
+        JLabel colorLabel = new JLabel("Máy chơi:");
+        JComboBox<String> colorCombo = new JComboBox<>(new String[]{"ĐEN", "TRẮNG"});
+        colorCombo.setSelectedItem(aiColor == PieceColor.BLACK ? "ĐEN" : "TRẮNG");
         
-        Color newLightColor = lightColor;
-        Color newDarkColor = darkColor;
+        panel.add(depthLabel);
+        panel.add(depthCombo);
+        panel.add(colorLabel);
+        panel.add(colorCombo);
         
-        switch (choice) {
-            case 0: // Mặc định
-                newLightColor = new Color(240, 217, 181);
-                newDarkColor = new Color(181, 136, 99);
-                break;
-            case 1: // Xanh lá/Xanh dương
-                newLightColor = new Color(173, 216, 230); // Xanh nhạt
-                newDarkColor = new Color(144, 238, 144);  // Xanh lá nhạt
-                break;
-            case 2: // Xám/Hồng
-                newLightColor = new Color(240, 240, 240); // Xám nhạt
-                newDarkColor = new Color(255, 182, 193);  // Hồng nhạt
-                break;
-            case 3: // Tự chọn
-                Color light = JColorChooser.showDialog(this, 
-                    "Chọn màu cho ô sáng", lightColor);
-                Color dark = JColorChooser.showDialog(this, 
-                    "Chọn màu cho ô tối", darkColor);
-                
-                if (light != null) newLightColor = light;
-                if (dark != null) newDarkColor = dark;
-                break;
-            default:
-                return;
-        }
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Cài đặt AI", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         
-        // Cập nhật màu mới
-        lightColor = newLightColor;
-        darkColor = newDarkColor;
-        
-        // Cập nhật màu nền cho tất cả các ô
-        for (int row = 0; row < 8; row++) {
-            for (int col = 0; col < 8; col++) {
-                squares[row][col].updateBackground();
+        if (result == JOptionPane.OK_OPTION) {
+            aiDifficulty = (Integer) depthCombo.getSelectedItem();
+            String selectedColor = (String) colorCombo.getSelectedItem();
+            aiColor = selectedColor.equals("ĐEN") ? PieceColor.BLACK : PieceColor.WHITE;
+            
+            // Tạo AI mới với cài đặt mới
+            chessAI = new ChessAI(aiColor, aiDifficulty);
+            
+            // Cập nhật trạng thái nếu cần
+            if (aiColor == PieceColor.WHITE) {
+                currentPlayer = PieceColor.BLACK;
+            } else {
+                currentPlayer = PieceColor.WHITE;
             }
-        }
-        
-        // Nếu có ô đang được chọn, thì đặt lại selection
-        if (selectedPosition != null) {
-            squares[selectedPosition.row][selectedPosition.col].setSelected(true);
-            // Và highlight các nước đi hợp lệ lại
-            highlightLegalMoves(selectedPosition.row, selectedPosition.col);
-        }
-    }
-    
-    private void showLegalMoves() {
-        List<Move> legalMoves = board.getLegalMoves(currentPlayer);
-        
-        if (legalMoves.isEmpty()) {
+            
+            updateStatus();
+            
             JOptionPane.showMessageDialog(this,
-                "Không có nước đi hợp lệ nào!",
-                "Nước đi hợp lệ",
+                "Đã cập nhật cài đặt AI:\n" +
+                "Độ khó: Cấp " + aiDifficulty + "\n" +
+                "Máy chơi: " + (aiColor == PieceColor.WHITE ? "TRẮNG" : "ĐEN"),
+                "Cài đặt AI",
                 JOptionPane.INFORMATION_MESSAGE);
-            return;
         }
-        
-        StringBuilder sb = new StringBuilder();
-        sb.append("Các nước đi hợp lệ cho ").append(currentPlayer).append(":\n\n");
-        
-        for (Move move : legalMoves) {
-            char fromColChar = (char)('a' + move.fromCol);
-            char toColChar = (char)('a' + move.toCol);
-            
-            sb.append(String.format("  %s %c%d → %c%d%n",
-                move.moved.getSymbol(),
-                fromColChar, (8 - move.fromRow),
-                toColChar, (8 - move.toRow)));
-        }
-        
-        sb.append("\nTổng cộng: ").append(legalMoves.size()).append(" nước đi");
-        
-        JTextArea textArea = new JTextArea(sb.toString());
-        textArea.setEditable(false);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(300, 400));
-        
-        JOptionPane.showMessageDialog(this,
-            scrollPane,
-            "Nước đi hợp lệ",
-            JOptionPane.INFORMATION_MESSAGE);
-    }
-    
-    private void showRules() {
-        String rules = """
-            LUẬT CHƠI CỜ VUA CƠ BẢN:
-            
-            1. Mục tiêu: Chiếu hết vua đối phương.
-            
-            2. Cách di chuyển:
-               - Tốt: Đi thẳng 1 ô, ăn chéo
-               - Mã: Đi hình chữ L
-               - Tượng: Đi chéo
-               - Xe: Đi thẳng
-               - Hậu: Đi thẳng và chéo
-               - Vua: Đi 1 ô mọi hướng
-            
-            3. Luật đặc biệt:
-               - Nhập thành: Vua và xe di chuyển cùng lúc
-               - Bắt tốt qua đường
-               - Phong cấp tốt
-            
-            4. Kết thúc trận:
-               - Chiếu hết
-               - Hết nước đi (hòa)
-               - Đầu hàng
-            """;
-            
-        JOptionPane.showMessageDialog(this,
-            rules,
-            "Luật chơi",
-            JOptionPane.INFORMATION_MESSAGE);
-    }
-    
-    private void showAbout() {
-        String about = """
-            CHESS GAME - JAVA SWING
-            
-            Phiên bản: 2.0 (Custom Panel Solution)
-            Tác giả: AI Assistant
-            
-            Tính năng:
-            - Sử dụng JPanel tùy chỉnh thay vì JButton
-            - Màu ô cờ xen kẽ đúng và không bị ghi đè
-            - Màu quân cờ không trùng với ô cờ
-            - Có thể tùy chỉnh màu quân cờ và bàn cờ
-            - Hiển thị Unicode cho quân cờ với outline
-            
-            Giải pháp: Dùng ChessSquare (JPanel) để kiểm soát hoàn toàn việc vẽ.
-            """;
-            
-        JOptionPane.showMessageDialog(this,
-            about,
-            "Giới thiệu",
-            JOptionPane.INFORMATION_MESSAGE);
     }
     
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
+                // Đặt Look and Feel theo hệ thống
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
                 e.printStackTrace();
