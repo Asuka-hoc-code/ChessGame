@@ -17,7 +17,7 @@ public class Queen extends Piece {
     public List<Position> getPossibleMoves(Board board) {
         List<Position> moves = new ArrayList<>();
 
-        // Kết hợp 8 hướng: Rook + Bishop
+        // Rook + Bishop
         int[] dr = {-1, -1, -1, 0, 1, 1, 1, 0};
         int[] dc = {-1, 0, 1, 1, 1, 0, -1, -1};
 

@@ -30,9 +30,9 @@ public class Bishop extends Piece {
                     moves.add(new Position(r, c));
                 } else {
                     if (board.getPiece(r, c).getColor() != this.color) {
-                        moves.add(new Position(r, c)); // ăn quân đối phương
+                        moves.add(new Position(r, c)); 
                     }
-                    break; // gặp quân → dừng hướng đó
+                    break; 
                 }
                 r += dr[i];
                 c += dc[i];

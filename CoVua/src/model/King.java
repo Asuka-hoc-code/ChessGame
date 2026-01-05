@@ -21,7 +21,7 @@ public class King extends Piece {
         int[] dr = {-1, -1, -1, 0, 1, 1, 1, 0};
         int[] dc = {-1, 0, 1, 1, 1, 0, -1, -1};
 
-        // Các nước đi thông thường của vua (1 ô xung quanh)
+        // di chuyển 1 ô xung quanh
         for (int i = 0; i < 8; i++) {
             int r = row + dr[i];
             int c = col + dc[i];
@@ -38,12 +38,12 @@ public class King extends Piece {
             int kingRow = (color == PieceColor.WHITE) ? 7 : 0;
             
             if (row == kingRow && col == 4) {
-                // Nhập thành ngắn (kingside)
+                // Nhập thành ngắn 
                 if (board.canCastle(color, true)) {
                     moves.add(new Position(row, col + 2));
                 }
                 
-                // Nhập thành dài (queenside)
+                // Nhập thành dài 
                 if (board.canCastle(color, false)) {
                     moves.add(new Position(row, col - 2));
                 }

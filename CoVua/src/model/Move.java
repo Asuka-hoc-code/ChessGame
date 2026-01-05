@@ -4,8 +4,8 @@ public class Move {
     public int fromRow, fromCol, toRow, toCol;
     public Piece moved;
     public Piece captured;
-    public boolean movedHadMoved;   // Trạng thái hasMoved của quân di chuyển trước khi đi
-    public boolean capturedHadMoved; // Trạng thái hasMoved của quân bị ăn (nếu có)
+    public boolean movedHadMoved;   
+    public boolean capturedHadMoved; 
     
     public Move(int fromRow, int fromCol, int toRow, int toCol, Piece moved, Piece captured) {
         this.fromRow = fromRow;

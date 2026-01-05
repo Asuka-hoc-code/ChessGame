@@ -37,7 +37,6 @@ public class GameTest {
         while (!gameOver) {
             printGameState();
             
-            // Nhận input từ người chơi
             System.out.print(currentPlayer + " đi: ");
             String input = scanner.nextLine().trim();
             
@@ -58,13 +57,10 @@ public class GameTest {
                 continue;
             }
             
-            // Xử lý nước đi
             if (processMove(input)) {
-                // Kiểm tra kết thúc trò chơi
                 checkGameEnd();
                 
                 if (!gameOver) {
-                    // Đổi lượt
                     currentPlayer = (currentPlayer == PieceColor.WHITE) ? 
                                     PieceColor.BLACK : PieceColor.WHITE;
                 }
@@ -79,7 +75,6 @@ public class GameTest {
     }
     
     private boolean processMove(String input) {
-        // Xử lý input: có thể là "e2 e4" hoặc "e2e4"
         String cleanInput = input.replaceAll("\\s+", "");
         
         if (cleanInput.length() != 4) {
@@ -87,18 +82,16 @@ public class GameTest {
         }
         
         try {
-            // Chuyển ký tự cột sang số: a->0, b->1, ...
             int fromCol = convertColumn(cleanInput.charAt(0));
             int fromRow = 8 - Character.getNumericValue(cleanInput.charAt(1));
             
             int toCol = convertColumn(cleanInput.charAt(2));
             int toRow = 8 - Character.getNumericValue(cleanInput.charAt(3));
             
-            // Kiểm tra và thực hiện nước đi
             return board.makeMove(fromRow, fromCol, toRow, toCol, currentPlayer);
             
         } catch (Exception e) {
-            return false; // Input không hợp lệ
+            return false;
         }
     }
     
@@ -136,7 +129,6 @@ public class GameTest {
         }
         
         if (board.undoLastMove()) {
-            // Đổi lượt về người chơi trước
             currentPlayer = (currentPlayer == PieceColor.WHITE) ? 
                             PieceColor.BLACK : PieceColor.WHITE;
             System.out.println("Đã hoàn tác nước đi cuối.");
@@ -153,7 +145,6 @@ public class GameTest {
             return;
         }
         
-        // Nhóm theo quân cờ
         for (Move move : legalMoves) {
             char fromColChar = (char)('a' + move.fromCol);
             char toColChar = (char)('a' + move.toCol);
@@ -171,7 +162,6 @@ public class GameTest {
         System.out.println("\n" + "=".repeat(40));
         System.out.println("Lượt: " + currentPlayer);
         
-        // Hiển thị cảnh báo nếu vua bị chiếu
         if (board.isInCheck(PieceColor.WHITE)) {
             System.out.println("⚠️  VUA TRẮNG ĐANG BỊ CHIẾU!");
         }
@@ -201,7 +191,6 @@ public class GameTest {
         System.out.println("=".repeat(40));
     }
     
-    // Getter cho testing
     public Board getBoard() {
         return board;
     }
@@ -252,17 +241,14 @@ public class GameTest {
         model.Board board = new model.Board();
         GameTest game = new GameTest();
         
-        // Test 1: Các nước đi hợp lệ ban đầu
         System.out.println("\n1. Test nước đi hợp lệ:");
         System.out.println("   e2 e4: " + board.isValidMove(6, 4, 4, 4, model.PieceColor.WHITE));
         System.out.println("   g1 f3: " + board.isValidMove(7, 6, 5, 5, model.PieceColor.WHITE));
         
-        // Test 2: Nước đi không hợp lệ
         System.out.println("\n2. Test nước đi không hợp lệ:");
         System.out.println("   e2 e5: " + board.isValidMove(6, 4, 3, 4, model.PieceColor.WHITE));
         System.out.println("   a1 a3: " + board.isValidMove(7, 0, 5, 0, model.PieceColor.WHITE));
         
-        // Test 3: Chiếu hết Scholar's Mate
         System.out.println("\n3. Test chiếu hết nhanh:");
         testScholarMate();
         
@@ -272,7 +258,6 @@ public class GameTest {
     private static void testScholarMate() {
         model.Board board = new model.Board();
         
-        // Scholar's Mate
         System.out.println("   e2 e4: " + board.makeMove(6, 4, 4, 4, model.PieceColor.WHITE));
         System.out.println("   e7 e5: " + board.makeMove(1, 4, 3, 4, model.PieceColor.BLACK));
         System.out.println("   d1 h5: " + board.makeMove(7, 3, 3, 7, model.PieceColor.WHITE));

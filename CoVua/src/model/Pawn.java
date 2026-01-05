@@ -16,7 +16,6 @@ public class Pawn extends Piece{
 
         int nextRow = row + direction;
 
-        // 1. Đi thẳng 1 ô
         if (inBounds(nextRow, col) && board.isEmpty(nextRow, col)) {
             moves.add(new Position(nextRow, col));
 
@@ -28,7 +27,7 @@ public class Pawn extends Piece{
             }
         }
 
-        // 3. Ăn chéo
+        // Ăn chéo
         int[] dc = {-1, 1};
         for (int d : dc) {
             int newCol = col + d;
